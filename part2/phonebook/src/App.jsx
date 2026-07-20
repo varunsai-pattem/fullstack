@@ -10,9 +10,11 @@ const App = () => {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
-  const [successMessage, setSuccessMessage] = useState(null)
+  const [notification, setNotification] = useState({
+    message: null,
+    type: null
+  })
 
-  // Fetch initial data
   useEffect(() => {
     personsService
       .getAll()
@@ -20,11 +22,21 @@ const App = () => {
         setPersons(initialPersons)
       })
       .catch(error => {
-        console.error('Failed to load initial contact data:', error)
+        console.error('Failed to fetch contacts:', error)
       })
   }, [])
 
-  // Add or update a person
+  const showNotification = (message, type) => {
+    setNotification({ message, type })
+
+    setTimeout(() => {
+      setNotification({
+        message: null,
+        type: null
+      })
+    }, 5000)
+  }
+
   const addPerson = (event) => {
     event.preventDefault()
 
@@ -32,12 +44,13 @@ const App = () => {
     const trimmedNumber = newNumber.trim()
 
     if (!trimmedName || !trimmedNumber) {
-      alert('Please enter both a name and a phone number.')
+      showNotification('Please enter both name and phone number', 'error')
       return
     }
 
     const existingPerson = persons.find(
-      person => person.name.toLowerCase() === trimmedName.toLowerCase()
+      person =>
+        person.name.toLowerCase() === trimmedName.toLowerCase()
     )
 
     if (existingPerson) {
@@ -59,21 +72,32 @@ const App = () => {
         .then(returnedPerson => {
           setPersons(
             persons.map(person =>
-              person.id !== existingPerson.id ? person : returnedPerson
+              person.id !== existingPerson.id
+                ? person
+                : returnedPerson
             )
           )
 
           setNewName('')
           setNewNumber('')
 
-          setSuccessMessage(`Changed number for ${returnedPerson.name}`)
-
-          setTimeout(() => {
-            setSuccessMessage(null)
-          }, 5000)
+          showNotification(
+            `Changed number for ${returnedPerson.name}`,
+            'success'
+          )
         })
         .catch(error => {
-          alert(`Failed to update number for ${trimmedName}`)
+          showNotification(
+            `Information of ${existingPerson.name} has already been removed from server`,
+            'error'
+          )
+
+          setPersons(
+            persons.filter(
+              person => person.id !== existingPerson.id
+            )
+          )
+
           console.error(error)
         })
 
@@ -93,19 +117,21 @@ const App = () => {
         setNewName('')
         setNewNumber('')
 
-        setSuccessMessage(`Added ${returnedPerson.name}`)
-
-        setTimeout(() => {
-          setSuccessMessage(null)
-        }, 5000)
+        showNotification(
+          `Added ${returnedPerson.name}`,
+          'success'
+        )
       })
       .catch(error => {
-        alert('Failed to save the new contact.')
+        showNotification(
+          'Failed to add the contact',
+          'error'
+        )
+
         console.error(error)
       })
   }
 
-  // Delete a person
   const handleRemovePerson = (id, name) => {
     const confirmDelete = window.confirm(`Delete ${name}?`)
 
@@ -116,16 +142,22 @@ const App = () => {
     personsService
       .remove(id)
       .then(() => {
-        setPersons(persons.filter(person => person.id !== id))
+        setPersons(
+          persons.filter(person => person.id !== id)
+        )
 
-        setSuccessMessage(`Deleted ${name}`)
-
-        setTimeout(() => {
-          setSuccessMessage(null)
-        }, 5000)
+        showNotification(`Deleted ${name}`, 'success')
       })
       .catch(error => {
-        alert(`${name} has already been removed from the server.`)
+        showNotification(
+          `Information of ${name} has already been removed from server`,
+          'error'
+        )
+
+        setPersons(
+          persons.filter(person => person.id !== id)
+        )
+
         console.error(error)
       })
   }
@@ -146,14 +178,16 @@ const App = () => {
     filterQuery === ''
       ? persons
       : persons.filter(person =>
-          person.name.toLowerCase().includes(filterQuery.toLowerCase())
+          person.name
+            .toLowerCase()
+            .includes(filterQuery.toLowerCase())
         )
 
   return (
     <div>
       <h2>Phonebook</h2>
 
-      <Notification message={successMessage} />
+      <Notification notification={notification} />
 
       <Filter
         value={filterQuery}
