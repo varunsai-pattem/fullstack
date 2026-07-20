@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Filter from './components/Filter'
 import PersonForm from './components/PersonForm'
 import Persons from './components/Persons'
+import Notification from './components/Notification'
 import personsService from './services/persons'
 
 const App = () => {
@@ -9,8 +10,9 @@ const App = () => {
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
+  const [successMessage, setSuccessMessage] = useState(null)
 
-  // Fetch contacts from backend when component mounts
+  // Fetch initial data
   useEffect(() => {
     personsService
       .getAll()
@@ -18,10 +20,11 @@ const App = () => {
         setPersons(initialPersons)
       })
       .catch(error => {
-        console.error('Failed to load contacts:', error)
+        console.error('Failed to load initial contact data:', error)
       })
   }, [])
 
+  // Add or update a person
   const addPerson = (event) => {
     event.preventDefault()
 
@@ -59,11 +62,18 @@ const App = () => {
               person.id !== existingPerson.id ? person : returnedPerson
             )
           )
+
           setNewName('')
           setNewNumber('')
+
+          setSuccessMessage(`Changed number for ${returnedPerson.name}`)
+
+          setTimeout(() => {
+            setSuccessMessage(null)
+          }, 5000)
         })
         .catch(error => {
-          alert(`Failed to update ${trimmedName}.`)
+          alert(`Failed to update number for ${trimmedName}`)
           console.error(error)
         })
 
@@ -79,8 +89,15 @@ const App = () => {
       .create(personObject)
       .then(returnedPerson => {
         setPersons(persons.concat(returnedPerson))
+
         setNewName('')
         setNewNumber('')
+
+        setSuccessMessage(`Added ${returnedPerson.name}`)
+
+        setTimeout(() => {
+          setSuccessMessage(null)
+        }, 5000)
       })
       .catch(error => {
         alert('Failed to save the new contact.')
@@ -88,6 +105,7 @@ const App = () => {
       })
   }
 
+  // Delete a person
   const handleRemovePerson = (id, name) => {
     const confirmDelete = window.confirm(`Delete ${name}?`)
 
@@ -99,6 +117,12 @@ const App = () => {
       .remove(id)
       .then(() => {
         setPersons(persons.filter(person => person.id !== id))
+
+        setSuccessMessage(`Deleted ${name}`)
+
+        setTimeout(() => {
+          setSuccessMessage(null)
+        }, 5000)
       })
       .catch(error => {
         alert(`${name} has already been removed from the server.`)
@@ -128,6 +152,8 @@ const App = () => {
   return (
     <div>
       <h2>Phonebook</h2>
+
+      <Notification message={successMessage} />
 
       <Filter
         value={filterQuery}
