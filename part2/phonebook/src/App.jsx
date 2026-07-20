@@ -1,37 +1,109 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Filter from './components/Filter'
 import PersonForm from './components/PersonForm'
 import Persons from './components/Persons'
+import personsService from './services/persons'
 
 const App = () => {
-  // Pre-populate with dummy data to test your search/filtering on launch
   const [persons, setPersons] = useState([])
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
 
+  // Fetch contacts from backend when component mounts
+  useEffect(() => {
+    personsService
+      .getAll()
+      .then(initialPersons => {
+        setPersons(initialPersons)
+      })
+      .catch(error => {
+        console.error('Failed to load contacts:', error)
+      })
+  }, [])
+
   const addPerson = (event) => {
     event.preventDefault()
 
-    // 2.7 check: Prevent duplicate name additions (case-insensitive)
-    const nameExists = persons.some(
-      (person) => person.name.toLowerCase() === newName.trim().toLowerCase()
+    const trimmedName = newName.trim()
+    const trimmedNumber = newNumber.trim()
+
+    if (!trimmedName || !trimmedNumber) {
+      alert('Please enter both a name and a phone number.')
+      return
+    }
+
+    const existingPerson = persons.find(
+      person => person.name.toLowerCase() === trimmedName.toLowerCase()
     )
 
-    if (nameExists) {
-      alert(`${newName.trim()} is already added to phonebook`)
+    if (existingPerson) {
+      const confirmUpdate = window.confirm(
+        `${trimmedName} is already added to the phonebook, replace the old number with a new one?`
+      )
+
+      if (!confirmUpdate) {
+        return
+      }
+
+      const updatedPerson = {
+        ...existingPerson,
+        number: trimmedNumber
+      }
+
+      personsService
+        .update(existingPerson.id, updatedPerson)
+        .then(returnedPerson => {
+          setPersons(
+            persons.map(person =>
+              person.id !== existingPerson.id ? person : returnedPerson
+            )
+          )
+          setNewName('')
+          setNewNumber('')
+        })
+        .catch(error => {
+          alert(`Failed to update ${trimmedName}.`)
+          console.error(error)
+        })
+
       return
     }
 
     const personObject = {
-      name: newName.trim(),
-      number: newNumber.trim(),
-      id: persons.length + 1 // Temporary numeric ID generation
+      name: trimmedName,
+      number: trimmedNumber
     }
 
-    setPersons(persons.concat(personObject))
-    setNewName('')
-    setNewNumber('')
+    personsService
+      .create(personObject)
+      .then(returnedPerson => {
+        setPersons(persons.concat(returnedPerson))
+        setNewName('')
+        setNewNumber('')
+      })
+      .catch(error => {
+        alert('Failed to save the new contact.')
+        console.error(error)
+      })
+  }
+
+  const handleRemovePerson = (id, name) => {
+    const confirmDelete = window.confirm(`Delete ${name}?`)
+
+    if (!confirmDelete) {
+      return
+    }
+
+    personsService
+      .remove(id)
+      .then(() => {
+        setPersons(persons.filter(person => person.id !== id))
+      })
+      .catch(error => {
+        alert(`${name} has already been removed from the server.`)
+        console.error(error)
+      })
   }
 
   const handleNameChange = (event) => {
@@ -46,20 +118,25 @@ const App = () => {
     setFilterQuery(event.target.value)
   }
 
-  // 2.9* check: Render matching contacts based on the case-insensitive filter
-  const personsToShow = filterQuery === ''
-   ? persons
-    : persons.filter(person => 
-        person.name.toLowerCase().includes(filterQuery.toLowerCase())
-      )
+  const personsToShow =
+    filterQuery === ''
+      ? persons
+      : persons.filter(person =>
+          person.name.toLowerCase().includes(filterQuery.toLowerCase())
+        )
 
   return (
     <div>
       <h2>Phonebook</h2>
-      <Filter value={filterQuery} onChange={handleFilterChange} />
-      
+
+      <Filter
+        value={filterQuery}
+        onChange={handleFilterChange}
+      />
+
       <h3>Add a new</h3>
-      <PersonForm 
+
+      <PersonForm
         onSubmit={addPerson}
         newName={newName}
         handleNameChange={handleNameChange}
@@ -68,7 +145,11 @@ const App = () => {
       />
 
       <h3>Numbers</h3>
-      <Persons persons={personsToShow} />
+
+      <Persons
+        persons={personsToShow}
+        onDelete={handleRemovePerson}
+      />
     </div>
   )
 }
